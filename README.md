@@ -3,7 +3,7 @@
 Phân tích báo giá ngay trên CRM https://quanly.baobidaiduong.com/bao-gia và https://crm.bangkeohaiau.com/bao-gia
 (giá vốn / NVL theo PO, lợi nhuận từ giá mốc, % deal, cờ cần xử lý, công cụ chỉnh giá, so giá khách bằng OCR).
 
-Phần phân tích hiện tại: **v2.0.1** · phần vỏ: **v2.0.0**
+Phần phân tích hiện tại: **v2.0.2** · phần vỏ: **v2.0.0**
 
 ## Cài đặt (làm 1 lần trên mỗi máy)
 
@@ -22,7 +22,7 @@ Phần phân tích hiện tại: **v2.0.1** · phần vỏ: **v2.0.0**
 - trang danh sách báo giá tự tải lại;
 - trang chi tiết báo giá hiện nút **"Tải lại trang"** (để không mất giá đang sửa dở — bấm "Cập nhật" lưu trước nếu cần).
 
-Số phiên bản đang chạy hiện cạnh tiêu đề "📊 Phân tích báo giá" (VD `v2.0.1`).
+Số phiên bản đang chạy hiện cạnh tiêu đề "📊 Phân tích báo giá" (VD `v2.0.2`).
 
 Chỉ khi có thông báo **"Phần vỏ extension đã cũ"** mới cần làm lại bước 1 (tải zip mới, giải nén **đè** vào thư mục cũ) rồi bấm nút tải lại (↻) ở thẻ extension trong `chrome://extensions`.
 
