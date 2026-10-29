@@ -49,3 +49,19 @@ Cài đặt giống Duyệt Báo Giá, chỉ khác gói cài: [install/PushGhiCh
 → giải nén (thư mục `PushGhiChu`, để cố định) → `chrome://extensions` → Developer mode → Load unpacked → chọn `PushGhiChu`
 → Chi tiết → bật **Cho phép tập lệnh người dùng** (Allow User Scripts) → tải lại trang CRM.
 Cập nhật tự động như Duyệt Báo Giá (phần chính đặt ở thư mục `push-ghi-chu/` của kho này, đã ký số).
+
+---
+
+# Nhanh.vn V2 (extension riêng, trên nhanh.vn)
+
+Hiện giá nhập / lợi nhuận, công nợ, điền giá… trên Nhanh.vn. Phần chính hiện tại: **v1.0.0** · phần vỏ: **v10.0.0**
+
+**Cài mới:** [install/NhanhV2.zip](https://github.com/trithucnguyen97/duyet-bao-gia/raw/main/install/NhanhV2.zip) → giải nén (thư mục `NhanhV2`, để cố định)
+→ `chrome://extensions` → Developer mode → Load unpacked → chọn `NhanhV2` → Chi tiết → bật **Cho phép tập lệnh người dùng** (Allow User Scripts).
+
+**Máy đang dùng bản cũ (thư mục git + update.bat):** chạy `update.bat` (Windows) / `update.command` (Mac) **lần cuối** → bấm tải lại (↻) ở thẻ extension → Chi tiết → bật **Cho phép tập lệnh người dùng**.
+Từ đây phần chính tự cập nhật, không cần chạy update nữa.
+
+**Kết nối Bảng giá (mỗi nhân viên một lần):** mở Nhanh.vn → bấm **"Kết nối Bảng giá"** trên thông báo (hoặc biểu tượng extension → Kết nối) → đăng nhập Bảng giá bằng tài khoản của bạn (mật khẩu hoặc đăng nhập Quản lý sản xuất) → bấm **Kết nối extension**.
+Mỗi máy có mã riêng; quản lý / thu hồi tại https://banggia.baobidaiduong.com/ext-connect/tokens . Extension không chứa mật khẩu hay mã dùng chung nào.
+
