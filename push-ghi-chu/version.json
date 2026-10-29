@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "minShell": "2.0.0",
+  "files": [
+    {
+      "file": "content.bundle.js",
+      "world": "USER_SCRIPT",
+      "sha256": "e769039c975cf9381de246cf000a9a917f7db8dec2d97df7b1e17492d7b8da9d"
+    }
+  ],
+  "sig": "NysmA4UhS3htq2WlzFX4GyfBQMDk9CUg4vSRds3SJXvjCCUEDz05zlPt6t1n7k/1XxMRIKfm0452+toGODOoEA==",
+  "shell": "2.0.0",
+  "builtAt": "2026-10-29T03:17:41.068Z"
+}

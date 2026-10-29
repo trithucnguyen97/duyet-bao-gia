@@ -38,3 +38,14 @@ Chỉ khi có thông báo **"Phần vỏ extension đã cũ"** mới cần làm 
 
 Phần phân tích tải từ kho này được **ký số**; extension chỉ chạy bản có chữ ký đúng (khóa riêng chỉ nằm trên máy người phát hành).
 Extension không gửi dữ liệu CRM ra ngoài: chỉ đọc API của chính CRM bằng phiên đăng nhập của bạn, OCR chạy ngay trên máy.
+
+---
+
+# Push giá tấm nhỏ vào Ghi chú (extension riêng, cùng CRM Đại Dương)
+
+Lấy "Tấm nhỏ" từ cột Đơn giá tấm → đẩy vào cột Ghi chú trên CRM. Phần chính hiện tại: **v2.0.0** · phần vỏ: **v2.0.0**
+
+Cài đặt giống Duyệt Báo Giá, chỉ khác gói cài: [install/PushGhiChu.zip](https://github.com/trithucnguyen97/duyet-bao-gia/raw/main/install/PushGhiChu.zip)
+→ giải nén (thư mục `PushGhiChu`, để cố định) → `chrome://extensions` → Developer mode → Load unpacked → chọn `PushGhiChu`
+→ Chi tiết → bật **Cho phép tập lệnh người dùng** (Allow User Scripts) → tải lại trang CRM.
+Cập nhật tự động như Duyệt Báo Giá (phần chính đặt ở thư mục `push-ghi-chu/` của kho này, đã ký số).
