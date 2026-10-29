@@ -1,9 +1,9 @@
 {
-  "version": "2.0.3",
+  "version": "2.0.4",
   "file": "bundle.js",
-  "sha256": "bd9c4d0014e88bb8ec314ce2affc5b0030d3ed65ff70044b46994aa98b53149e",
-  "sig": "3wCJIBzv2vT2hLAhkMZFpNUTHWJM0Y2kcEfYJzv6WUkXVTFzc5cDvfUR4wVSkZh+bEgEjsqfbdKB/FgjHXcBWA==",
+  "sha256": "a0bd65bef78cff68af7152f7a7989a7385fc06bf0dc3243496f32754a1980213",
+  "sig": "S0h4vJv0knJlr4zkwCdWk4bc3asK2xE4tnktLsV+3XZ62payU5ZHiiNmp5d3JsltWms6ZVIsw+5qmhmU3GCtvw==",
   "minShell": "2.0.0",
   "shell": "2.0.0",
-  "builtAt": "2026-10-29T03:09:05.885Z"
+  "builtAt": "2026-10-29T03:57:21.065Z"
 }

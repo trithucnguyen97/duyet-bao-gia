@@ -3,7 +3,7 @@
 Phân tích báo giá ngay trên CRM https://quanly.baobidaiduong.com/bao-gia và https://crm.bangkeohaiau.com/bao-gia
 (giá vốn / NVL theo PO, lợi nhuận từ giá mốc, % deal, cờ cần xử lý, công cụ chỉnh giá, so giá khách bằng OCR).
 
-Phần phân tích hiện tại: **v2.0.3** · phần vỏ: **v2.0.0**
+Phần phân tích hiện tại: **v2.0.4** · phần vỏ: **v2.0.0**
 
 ## Cài đặt (làm 1 lần trên mỗi máy)
 
@@ -16,13 +16,23 @@ Phần phân tích hiện tại: **v2.0.3** · phần vỏ: **v2.0.0**
 6. Mở trang báo giá của CRM và đăng nhập như bình thường. Thanh **📊 Phân tích báo giá** sẽ hiện trên trang
    (lần đầu có thể cần tải lại trang 1 lần).
 
+## Cài trên Safari (Mac) — qua ứng dụng Userscripts
+
+1. Cài **Userscripts** (miễn phí) từ Mac App Store, mở ứng dụng một lần và chọn thư mục lưu script (**Change save location**, VD `Documents/Userscripts`).
+2. Safari → **Cài đặt** → **Tiện ích mở rộng** → bật **Userscripts**, bấm **Sửa trang web…** → cho phép trên `quanly.baobidaiduong.com` và `crm.bangkeohaiau.com` (chọn **Cho phép**).
+3. Mở bằng Safari: [safari/DuyetBaoGia.user.js](https://raw.githubusercontent.com/trithucnguyen97/duyet-bao-gia/main/safari/DuyetBaoGia.user.js) → bấm biểu tượng Userscripts trên thanh công cụ → **Install** (Cài đặt).
+4. Mở trang báo giá của CRM. Thanh **📊 Phân tích báo giá** hiện như trên Chrome.
+
+Bản Safari tự cập nhật phần phân tích giống Chrome (kiểm chữ ký số); khi có bản mới, trang hiện nút **Tải lại trang**.
+Riêng **đọc ảnh bảng giá khách (OCR)** chưa có trên Safari — dùng Chrome cho việc này, hoặc gõ giá khách vào ô "Giá khách".
+
 ## Cập nhật
 
 **Tự động.** Mỗi khi mở CRM (và 15 phút một lần), extension kiểm tra bản mới trên GitHub, kiểm chữ ký rồi tự nạp:
 - trang danh sách báo giá tự tải lại;
 - trang chi tiết báo giá hiện nút **"Tải lại trang"** (để không mất giá đang sửa dở — bấm "Cập nhật" lưu trước nếu cần).
 
-Số phiên bản đang chạy hiện cạnh tiêu đề "📊 Phân tích báo giá" (VD `v2.0.3`).
+Số phiên bản đang chạy hiện cạnh tiêu đề "📊 Phân tích báo giá" (VD `v2.0.4`).
 
 Chỉ khi có thông báo **"Phần vỏ extension đã cũ"** mới cần làm lại bước 1 (tải zip mới, giải nén **đè** vào thư mục cũ) rồi bấm nút tải lại (↻) ở thẻ extension trong `chrome://extensions`.
 
