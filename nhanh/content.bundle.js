@@ -1,8 +1,8 @@
-/* Nhanh.vn V2 — content.bundle.js v1.0.1 (đã ký; build 2026-11-03T18:01:45.111Z) */
+/* Nhanh.vn V2 — content.bundle.js v1.0.3 (đã ký; build 2026-11-04T05:41:58.669Z) */
 (function () {
   if (window["__payload_content_bundle_js"]) return;
-  window["__payload_content_bundle_js"] = "1.0.1";
-  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.1"); } catch (e) {}
+  window["__payload_content_bundle_js"] = "1.0.3";
+  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.3"); } catch (e) {}
 const CONFIG = {
     SELECTORS: {
         PRODUCT_ROWS: [
@@ -51,8 +51,14 @@ function phoneKey(phone) { return phoneKeyCache[phone] || (phoneKeyCache[phone] 
 let lastDetectedPhone = null;
 
 let globalTapePrices = null;
-let isFetchingPrices = false;
+// Mỗi bảng giá một cờ: tải giá khách không được chặn lần kiểm tra bảng chung
+const fetchingPriceKeys = new Set();
 const PRICE_CACHE_TTL_MS = 30 * 60 * 1000; // bảng giá cache 30 phút, hết hạn thì tải lại nền
+// Hỏi lại bảng giá chung định kỳ, kể cả khi còn cache hoặc đang ở chế độ giá khách: API chỉ báo mất quyền khi được gọi
+const COST_ACCESS_CHECK_MS = 10 * 60 * 1000;
+const COST_CHECKED_AT_KEY = 'tapePricesCheckedAt';
+const COST_DENIED_KEY = 'tapePricesDenied'; // '1' = mất quyền, 'seen' = đã bấm "Đã hiểu"
+let costDenied = !!localStorage.getItem(COST_DENIED_KEY);
 
 // Chuẩn hóa tên sản phẩm để so khớp: Nhanh có tên nhập bằng dấu nhân "×", API banggia dùng chữ "x";
 // khoảng trắng thừa / hoa thường cũng không được làm lệch kết quả.
@@ -133,6 +139,108 @@ function detectColumnIndices() {
     return indices;
 }
 
+function clearProfitLabels() {
+    withSelfWrite(() => {
+        document.querySelectorAll('[data-processed]').forEach(el => delete el.dataset.processed);
+        document.querySelectorAll('.nhanh-ext-edit-profit, .nhanh-ext-row-profit, .nhanh-ext-total-profit').forEach(el => el.remove());
+    });
+}
+
+function priceCacheKey() {
+    return activePriceMode === 'default' ? 'tapePrices' : `tapePrices_${activePriceMode}`;
+}
+
+// Phần vỏ cài trên máy báo 403 bằng lỗi dạng "Error: HTTP 403"
+function isCostDeniedResponse(response) {
+    return !!response && !response.success && /\bHTTP 403\b/.test(String(response.error || ''));
+}
+
+function renderCostDeniedNotice() {
+    const old = document.getElementById('nhanhCostDeniedNotice');
+    if (localStorage.getItem(COST_DENIED_KEY) !== '1') {
+        if (old) withSelfWrite(() => old.remove());
+        return;
+    }
+    if (old || !document.body) return;
+    const box = document.createElement('div');
+    box.id = 'nhanhCostDeniedNotice';
+    box.setAttribute('role', 'status');
+    box.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483000;background:#b42318;color:#fff;padding:12px 14px;border-radius:10px;font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:min(460px,calc(100vw - 32px))';
+    const title = document.createElement('div');
+    title.style.fontWeight = '700';
+    title.textContent = '🔒 Tài khoản Bảng giá của bạn không có quyền xem giá nhập';
+    const detail = document.createElement('div');
+    detail.textContent = 'Extension đã xoá giá nhập lưu trên máy này và ẩn giá nhập, lợi nhuận. Nếu công việc cần xem, hãy liên hệ quản trị viên.';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = 'Đã hiểu';
+    ok.style.cssText = 'margin-top:8px;background:#fff;color:#b42318;border:0;border-radius:6px;padding:4px 12px;font-weight:600;cursor:pointer';
+    ok.addEventListener('click', () => {
+        localStorage.setItem(COST_DENIED_KEY, 'seen');
+        renderCostDeniedNotice();
+    });
+    box.append(title, detail, ok);
+    withSelfWrite(() => document.body.appendChild(box));
+}
+
+// Bỏ mọi bản sao giá nhập trên trang. Giá riêng của khách không phải giá nhập nên giữ nguyên.
+function dropDefaultPrices() {
+    localStorage.removeItem('tapePrices');
+    normalizedPriceMap = null;
+    normalizedPriceSource = null;
+    if (activePriceMode === 'default') {
+        globalTapePrices = null;
+        clearProfitLabels();
+    }
+}
+
+function clearCostDenied() {
+    costDenied = false;
+    localStorage.removeItem(COST_DENIED_KEY);
+    renderCostDeniedNotice();
+}
+
+function requestPrices(message, cacheKey, isBackgroundRefresh) {
+    if (fetchingPriceKeys.has(cacheKey)) return;
+    fetchingPriceKeys.add(cacheKey);
+    const isDefaultTable = message.action === 'fetchTapePrices';
+    if (isDefaultTable) localStorage.setItem(COST_CHECKED_AT_KEY, String(Date.now()));
+    chrome.runtime.sendMessage(message, response => {
+        fetchingPriceKeys.delete(cacheKey);
+        if (isDefaultTable && isCostDeniedResponse(response)) {
+            // Không ghi đè 'seen': người dùng đã đọc thông báo thì không hiện lại ở mỗi lần kiểm tra
+            if (!localStorage.getItem(COST_DENIED_KEY)) localStorage.setItem(COST_DENIED_KEY, '1');
+            costDenied = true;
+            dropDefaultPrices();
+            renderCostDeniedNotice();
+            return;
+        }
+        // Không còn token (bị thu hồi, tài khoản bị khoá, tự ngắt kết nối): cũng không được giữ giá nhập.
+        // Việc kết nối lại do phần vỏ nhắc, đây không phải trường hợp thiếu quyền nên bỏ thông báo mất quyền.
+        if (response && response.error === 'NOT_CONNECTED') {
+            dropDefaultPrices();
+            if (costDenied) clearCostDenied();
+            return;
+        }
+        if (!response || !response.success) return;
+        localStorage.setItem(cacheKey, JSON.stringify({ __ts: Date.now(), prices: response.prices }));
+        if (isDefaultTable && costDenied) clearCostDenied();
+        // Lần kiểm tra bảng chung có thể trả về khi trang đang ở chế độ giá khách
+        if (cacheKey !== priceCacheKey()) return;
+        if (isBackgroundRefresh && JSON.stringify(globalTapePrices) === JSON.stringify(response.prices)) return;
+        globalTapePrices = response.prices;
+        // Bảng giá mới -> tính lại toàn bộ dòng đã xử lý bằng bảng cũ
+        if (isBackgroundRefresh) clearProfitLabels();
+        runMainLogic();
+    });
+}
+
+function checkCostAccess(force) {
+    const checkedAt = Number(localStorage.getItem(COST_CHECKED_AT_KEY)) || 0;
+    if (!force && Date.now() - checkedAt < COST_ACCESS_CHECK_MS) return;
+    requestPrices({ action: "fetchTapePrices" }, 'tapePrices', true);
+}
+
 function fetchTapePricesSafely() {
     const customerInfo = detectCustomerPhone();
     const newMode = customerInfo ? `customer_${customerInfo.id}` : 'default';
@@ -140,33 +248,16 @@ function fetchTapePricesSafely() {
     if (newMode !== activePriceMode) {
         activePriceMode = newMode;
         globalTapePrices = null;
-        document.querySelectorAll('[data-processed]').forEach(el => delete el.dataset.processed);
-        document.querySelectorAll('.nhanh-ext-edit-profit, .nhanh-ext-row-profit').forEach(el => el.remove());
+        clearProfitLabels();
     }
 
     if (globalTapePrices) return globalTapePrices;
+    if (activePriceMode === 'default' && costDenied) return null;
 
-    const cacheKey = activePriceMode === 'default' ? 'tapePrices' : `tapePrices_${activePriceMode}`;
+    const cacheKey = priceCacheKey();
     const message = customerInfo
         ? { action: "fetchCustomerPrices", customerId: customerInfo.id }
         : { action: "fetchTapePrices" };
-
-    const requestPrices = (isBackgroundRefresh) => {
-        if (isFetchingPrices) return;
-        isFetchingPrices = true;
-        chrome.runtime.sendMessage(message, response => {
-            isFetchingPrices = false;
-            if (!response || !response.success) return;
-            localStorage.setItem(cacheKey, JSON.stringify({ __ts: Date.now(), prices: response.prices }));
-            globalTapePrices = response.prices;
-            if (isBackgroundRefresh) {
-                // Bảng giá mới -> tính lại toàn bộ dòng đã xử lý bằng bảng cũ
-                document.querySelectorAll('[data-processed]').forEach(el => delete el.dataset.processed);
-                document.querySelectorAll('.nhanh-ext-edit-profit, .nhanh-ext-row-profit').forEach(el => el.remove());
-            }
-            runMainLogic();
-        });
-    };
 
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -175,14 +266,14 @@ function fetchTapePricesSafely() {
             const wrapped = parsed && typeof parsed === 'object' && parsed.__ts && parsed.prices;
             globalTapePrices = wrapped ? parsed.prices : parsed;
             const age = wrapped ? Date.now() - parsed.__ts : Infinity;
-            if (age > PRICE_CACHE_TTL_MS) requestPrices(true); // dùng cache cũ trước, tải mới ở nền
+            if (age > PRICE_CACHE_TTL_MS) requestPrices(message, cacheKey, true); // dùng cache cũ trước, tải mới ở nền
             return globalTapePrices;
         } catch (e) {
             localStorage.removeItem(cacheKey);
         }
     }
 
-    requestPrices(false);
+    requestPrices(message, cacheKey, false);
     return null;
 }
 
@@ -347,6 +438,7 @@ function enhanceProductRows_EditPage() {
     const rows = document.querySelectorAll("tr.productItem");
     const tapePrices = fetchTapePricesSafely();
     if (!tapePrices) {
+        if (activePriceMode === 'default' && costDenied) return;
         // Nếu chưa có prices, đợi một chút rồi thử lại
         setTimeout(() => {
             if (location.href.includes("/order/manage/add") || location.href.includes("/order/manage/edit")) {
@@ -1422,6 +1514,7 @@ function runMainLogic() {
 
     columnIndices = detectColumnIndices();
     const tapePrices = fetchTapePricesSafely();
+    renderCostDeniedNotice();
 
     if (isOrderPage && !isOrderEdit && document.querySelector(".tableDataGird, #dgOrders, table.table")) {
         if (tapePrices) processTapePrices(tapePrices);
@@ -1500,6 +1593,26 @@ history.pushState = wrapHistory("pushState");
 history.replaceState = wrapHistory("replaceState");
 window.addEventListener("popstate", () => setTimeout(runMainLogic, 100));
 
+// Tab khác của nhanh.vn vừa xoá giá nhập, phát hiện mất quyền hoặc có lại quyền
+window.addEventListener("storage", (e) => {
+    if (e.key === 'tapePrices' && e.newValue === null) dropDefaultPrices();
+    if (e.key !== COST_DENIED_KEY) return;
+    if (e.newValue) {
+        costDenied = true;
+        dropDefaultPrices();
+        renderCostDeniedNotice();
+    } else {
+        costDenied = false;
+        renderCostDeniedNotice();
+        if (activePriceMode === 'default') runMainLogic();
+    }
+});
+
 runMainLogic();
+// Đang bị từ chối thì mỗi lần mở trang đều hỏi lại, để có quyền lại là dùng được ngay
+checkCostAccess(costDenied);
+setInterval(() => {
+    if (document.visibilityState === 'visible') checkCostAccess(false);
+}, 60 * 1000);
 
 })();
