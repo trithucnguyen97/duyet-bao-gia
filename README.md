@@ -75,3 +75,15 @@ Từ đây phần chính tự cập nhật, không cần chạy update nữa.
 **Kết nối Bảng giá (mỗi nhân viên một lần):** mở Nhanh.vn → bấm **"Kết nối Bảng giá"** trên thông báo (hoặc biểu tượng extension → Kết nối) → đăng nhập Bảng giá bằng tài khoản của bạn (mật khẩu hoặc đăng nhập Quản lý sản xuất) → bấm **Kết nối extension**.
 Mỗi máy có mã riêng; quản lý / thu hồi tại https://banggia.baobidaiduong.com/ext-connect/tokens . Extension không chứa mật khẩu hay mã dùng chung nào.
 
+---
+
+# Nhanh vn Đại Dương — bản cho Sale (extension riêng, trên nhanh.vn)
+
+QR thanh toán, upload ảnh đơn hàng, các nút tiện ích trên Nhanh.vn. Phần chính hiện tại: **v1.0.0** · phần vỏ: **v3.0.0**
+
+**Cài mới:** [install/NhanhSale.zip](https://github.com/trithucnguyen97/duyet-bao-gia/raw/main/install/NhanhSale.zip) → giải nén (thư mục `NhanhSale`, để cố định)
+→ `chrome://extensions` → Developer mode → Load unpacked → chọn `NhanhSale` → Chi tiết → bật **Cho phép tập lệnh người dùng** (Allow User Scripts) → tải lại trang Nhanh.vn.
+
+**Máy đang dùng bản cũ:** gỡ extension cũ (`chrome://extensions` → Remove) rồi cài như trên, nếu để cả hai thì mỗi trang chạy hai lần.
+
+Cập nhật tự động, đã ký số. Bản này không cần kết nối Bảng giá.
