@@ -1,8 +1,8 @@
-/* Nhanh.vn V2 — content.bundle.js v1.0.3 (đã ký; build 2026-11-04T05:41:58.669Z) */
+/* Nhanh.vn V2 — content.bundle.js v1.0.4 (đã ký; build 2026-11-10T03:41:26.388Z) */
 (function () {
   if (window["__payload_content_bundle_js"]) return;
-  window["__payload_content_bundle_js"] = "1.0.3";
-  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.3"); } catch (e) {}
+  window["__payload_content_bundle_js"] = "1.0.4";
+  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.4"); } catch (e) {}
 const CONFIG = {
     SELECTORS: {
         PRODUCT_ROWS: [
@@ -16,7 +16,28 @@ const CONFIG = {
 
 // === SĐT → BẢNG GIÁ KHÁCH ===
 const BANGGIA_BASE = "https://banggia.baobidaiduong.com";
-// SĐT khách -> bảng giá riêng trên Bảng giá (banggia.baobidaiduong.com/prices/<id>).
+// Tra SĐT trên Bảng giá (nhập ở trang Khách hàng). Mỗi số tra lại sau 5 phút để nhận số vừa thêm.
+const PHONE_LOOKUP_TTL_MS = 5 * 60 * 1000;
+const phoneLookups = {};
+function lookupCustomerByPhone(phone) {
+    let entry = phoneLookups[phone];
+    if (entry && (entry.pending || Date.now() - entry.at < PHONE_LOOKUP_TTL_MS)) return entry.customer;
+    if (!/^0[1-9]/.test(phone)) return null;
+    entry = phoneLookups[phone] = { pending: true, at: Date.now(), customer: entry ? entry.customer : null };
+    // Phần vỏ đã cài chỉ gửi được customer_id dạng số: SĐT đi qua đó, máy chủ nhận ra và trả { __customer } (không kèm giá)
+    chrome.runtime.sendMessage({ action: "fetchCustomerPrices", customerId: phone }, response => {
+        entry.pending = false;
+        entry.at = Date.now();
+        if (!response || !response.success) return; // chưa kết nối / lỗi mạng: giữ kết quả cũ, 5 phút sau thử lại
+        const c = response.prices && response.prices.__customer;
+        const customer = c && Number.isInteger(c.id) && c.id > 0 ? { id: c.id, name: String(c.name || ''), hash: String(c.hash || '') } : null;
+        const changed = (entry.customer && entry.customer.id) !== (customer && customer.id);
+        entry.customer = customer;
+        if (changed) runMainLogic();
+    });
+    return entry.customer;
+}
+// SĐT khách -> bảng giá riêng, dự phòng cho các số chưa nhập ở trang Khách hàng (nhập rồi thì xoá khỏi đây được).
 // Phần chính phát hành CÔNG KHAI -> khóa là MÃ BĂM của SĐT, không ghi số thô. Tạo mã: node tools/phone-key.mjs <sđt>
 const CUSTOMER_PHONE_MAP = {
     "3c346b1e848d933b3a184c41": { id: 23, name: "Thành Phạm", hash: "THANH_PHAM" },
@@ -1453,7 +1474,7 @@ function detectCustomerPhone() {
     const raw = (input.value || '').replace(/[\s\-\.]/g, '');
     if (!/^0\d{9,10}$/.test(raw)) return null;
 
-    const match = CUSTOMER_PHONE_MAP[phoneKey(raw)];
+    const match = lookupCustomerByPhone(raw) || CUSTOMER_PHONE_MAP[phoneKey(raw)];
     return match ? { phone: raw, ...match } : null;
 }
 
@@ -1471,7 +1492,9 @@ function showCustomerPriceBanner() {
     lastDetectedPhone = info.phone;
     if (banner) banner.remove();
 
-    const url = `${BANGGIA_BASE}/prices/${info.id}#${info.hash}`;
+    const url = `${BANGGIA_BASE}/prices/${info.id}#${encodeURIComponent(info.hash)}`;
+    // Tên khách do người dùng nhập ở Bảng giá, không được coi là HTML
+    const safeName = info.name.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
     const el = document.createElement('div');
     el.id = 'nhanhCustomerPriceBanner';
@@ -1482,7 +1505,7 @@ function showCustomerPriceBanner() {
                     box-shadow: 0 2px 8px rgba(13,110,253,0.3);">
             <span style="font-size: 22px;">📋</span>
             <div style="flex:1;">
-                <div style="font-weight: bold; font-size: 15px;">Bảng giá KH: ${info.name}</div>
+                <div style="font-weight: bold; font-size: 15px;">Bảng giá KH: ${safeName}</div>
                 <div style="font-size: 12px; opacity: 0.85;">SĐT ${info.phone} – ID #${info.id}</div>
             </div>
             <a href="${url}" target="_blank" rel="noopener"

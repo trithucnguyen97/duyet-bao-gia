@@ -1,8 +1,8 @@
-/* Nhanh.vn V2 — inject.bundle.js v1.0.3 (đã ký; build 2026-11-04T05:41:58.787Z) */
+/* Nhanh.vn V2 — inject.bundle.js v1.0.4 (đã ký; build 2026-11-10T03:41:26.536Z) */
 (function () {
   if (window["__payload_inject_bundle_js"]) return;
-  window["__payload_inject_bundle_js"] = "1.0.3";
-  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.3"); } catch (e) {}
+  window["__payload_inject_bundle_js"] = "1.0.4";
+  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.4"); } catch (e) {}
 
 window.addEventListener('nhanh-ext-fill-price', function (e) {
     var marker = e.detail && e.detail.marker;
