@@ -1,8 +1,8 @@
-/* Nhanh.vn V2 — content.bundle.js v1.0.4 (đã ký; build 2026-11-10T03:41:26.388Z) */
+/* Nhanh.vn V2 — content.bundle.js v1.0.5 (đã ký; build 2026-11-10T04:49:26.275Z) */
 (function () {
   if (window["__payload_content_bundle_js"]) return;
-  window["__payload_content_bundle_js"] = "1.0.4";
-  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.4"); } catch (e) {}
+  window["__payload_content_bundle_js"] = "1.0.5";
+  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.5"); } catch (e) {}
 const CONFIG = {
     SELECTORS: {
         PRODUCT_ROWS: [
@@ -105,6 +105,42 @@ function lookupPrice(tapePrices, name) {
     }
     return normalizedPriceMap[normalizeProductName(name)];
 }
+
+// Giá bán chung theo mốc (Bảng giá trả trong "__tiers": { tên SP: [[nhãn, giá], ...] }, mốc nhỏ -> lớn).
+// Trả câu cho biết giá sale báo đang ở mốc nào; giá cao hơn mọi mốc thì không ghi gì.
+let normalizedTierMap = null;
+let normalizedTierSource = null;
+function lookupTiers(tapePrices, name) {
+    const all = tapePrices && tapePrices.__tiers;
+    if (!all || typeof all !== 'object' || !name) return null;
+    if (Array.isArray(all[name])) return all[name];
+    if (normalizedTierSource !== all) {
+        normalizedTierMap = {};
+        Object.keys(all).forEach(k => { normalizedTierMap[normalizeProductName(k)] = all[k]; });
+        normalizedTierSource = all;
+    }
+    const t = normalizedTierMap[normalizeProductName(name)];
+    return Array.isArray(t) ? t : null;
+}
+function describePriceTier(tiers, price) {
+    if (!Array.isArray(tiers) || !(price > 0)) return '';
+    const list = tiers.filter(t => Array.isArray(t) && typeof t[0] === 'string' && Number(t[1]) > 0)
+        .map(t => ({ label: t[0], price: Number(t[1]) }));
+    if (!list.length) return '';
+    const exact = list.find(t => t.price === price);
+    if (exact) return exact.label;
+    const lower = s => s.charAt(0).toLowerCase() + s.slice(1);
+    // Mốc gần nhất có giá cao hơn và thấp hơn giá báo
+    let above = null, below = null;
+    list.forEach(t => {
+        if (t.price > price && (!above || t.price < above.price)) above = t;
+        if (t.price < price && (!below || t.price > below.price)) below = t;
+    });
+    if (above && below) return `Giữa ${lower(above.label)} và ${lower(below.label)}`;
+    if (below) return '';
+    return `Thấp hơn ${lower(above.label)} (${above.price.toLocaleString('vi-VN')} đ)`;
+}
+
 let columnIndices = null;
 let activePriceMode = 'default'; // 'default' | 'customer_XX'
 
@@ -417,9 +453,13 @@ function processTapePrices(tapePrices) {
             const pLabel = isCustomerMode ? 'Giá KH' : 'Giá nhập';
             let costPriceColor = costPrice <= sellPrice ? "green" : "red";
             let profitColor = profit >= 0 ? "green" : "red";
+            const tierText = isCustomerMode ? '' : describePriceTier(lookupTiers(tapePrices, product), sellPrice);
+            const tierHtml = tierText
+                ? `<span class="nhanh-ext-tier" style='color: #6f42c1; font-weight: bold;'>${tierText.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)}</span><br>`
+                : '';
 
             const htmlValues = `<div class="nhanh-ext-row-profit mt-1" style="font-size: 11px; line-height: 1.2;">
-                 <span style='color: ${costPriceColor}; font-weight: bold;'>${pLabel}: ${formatCurrency(costPrice)} (${profitPercent})</span><br>
+                 ${tierHtml}<span style='color: ${costPriceColor}; font-weight: bold;'>${pLabel}: ${formatCurrency(costPrice)} (${profitPercent})</span><br>
                  <span style='color: ${profitColor}; font-weight: bold;'>Lợi nhuận: ${formatCurrency(profit)}</span>
              </div>`;
 
