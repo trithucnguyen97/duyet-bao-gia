@@ -1,8 +1,8 @@
-/* Nhanh.vn V2 — content.bundle.js v1.0.5 (đã ký; build 2026-11-10T04:49:26.275Z) */
+/* Nhanh.vn V2 — content.bundle.js v1.0.6 (đã ký; build 2026-11-10T06:54:20.512Z) */
 (function () {
   if (window["__payload_content_bundle_js"]) return;
-  window["__payload_content_bundle_js"] = "1.0.5";
-  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.5"); } catch (e) {}
+  window["__payload_content_bundle_js"] = "1.0.6";
+  try { document.documentElement.setAttribute("data-nhx-payload", "1.0.6"); } catch (e) {}
 const CONFIG = {
     SELECTORS: {
         PRODUCT_ROWS: [
@@ -138,8 +138,11 @@ function describePriceTier(tiers, price) {
     });
     if (above && below) return `Giữa ${lower(above.label)} và ${lower(below.label)}`;
     if (below) return '';
-    return `Thấp hơn ${lower(above.label)} (${above.price.toLocaleString('vi-VN')} đ)`;
+    // Thấp hơn cả mốc rẻ nhất của bảng giá chung -> cảnh báo (isPriceTierWarning nhận ra bằng tiền tố này)
+    return `${TIER_WARNING_PREFIX}Giá thấp hơn ${lower(above.label)} (${above.price.toLocaleString('vi-VN')} đ)`;
 }
+const TIER_WARNING_PREFIX = '⚠ Cảnh báo: ';
+function isPriceTierWarning(text) { return typeof text === 'string' && text.startsWith(TIER_WARNING_PREFIX); }
 
 let columnIndices = null;
 let activePriceMode = 'default'; // 'default' | 'customer_XX'
@@ -454,9 +457,11 @@ function processTapePrices(tapePrices) {
             let costPriceColor = costPrice <= sellPrice ? "green" : "red";
             let profitColor = profit >= 0 ? "green" : "red";
             const tierText = isCustomerMode ? '' : describePriceTier(lookupTiers(tapePrices, product), sellPrice);
-            const tierHtml = tierText
-                ? `<span class="nhanh-ext-tier" style='color: #6f42c1; font-weight: bold;'>${tierText.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)}</span><br>`
-                : '';
+            const tierSafe = tierText.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+            const tierHtml = !tierText ? ''
+                : isPriceTierWarning(tierText)
+                    ? `<span class="nhanh-ext-tier nhanh-ext-tier-warn" style='display: inline-block; margin: 1px 0 2px; padding: 1px 5px; border-radius: 4px; background: #dc3545; color: #fff; font-weight: bold;'>${tierSafe}</span><br>`
+                    : `<span class="nhanh-ext-tier" style='color: #6f42c1; font-weight: bold;'>${tierSafe}</span><br>`;
 
             const htmlValues = `<div class="nhanh-ext-row-profit mt-1" style="font-size: 11px; line-height: 1.2;">
                  ${tierHtml}<span style='color: ${costPriceColor}; font-weight: bold;'>${pLabel}: ${formatCurrency(costPrice)} (${profitPercent})</span><br>

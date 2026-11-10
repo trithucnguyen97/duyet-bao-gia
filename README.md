@@ -64,7 +64,7 @@ Cập nhật tự động như Duyệt Báo Giá (phần chính đặt ở thư 
 
 # Nhanh.vn V2 (extension riêng, trên nhanh.vn)
 
-Hiện giá nhập / lợi nhuận, công nợ, điền giá… trên Nhanh.vn. Phần chính hiện tại: **v1.0.5** · phần vỏ: **v10.0.0**
+Hiện giá nhập / lợi nhuận, công nợ, điền giá… trên Nhanh.vn. Phần chính hiện tại: **v1.0.6** · phần vỏ: **v10.0.0**
 
 **Cài mới:** [install/NhanhV2.zip](https://github.com/trithucnguyen97/duyet-bao-gia/raw/main/install/NhanhV2.zip) → giải nén (thư mục `NhanhV2`, để cố định)
 → `chrome://extensions` → Developer mode → Load unpacked → chọn `NhanhV2` → Chi tiết → bật **Cho phép tập lệnh người dùng** (Allow User Scripts).
