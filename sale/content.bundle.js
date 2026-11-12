@@ -1,8 +1,8 @@
-/* Nhanh vn Đại Dương (Sale) — content.bundle.js v1.0.0 (đã ký; build 2026-11-04T03:37:24.597Z) */
+/* Nhanh vn Đại Dương (Sale) — content.bundle.js v1.0.1 (đã ký; build 2026-11-12T06:32:47.066Z) */
 (function () {
   if (window["__payload_content_bundle_js"]) return;
-  window["__payload_content_bundle_js"] = "1.0.0";
-  try { document.documentElement.setAttribute("data-nhs-payload", "1.0.0"); } catch (e) {}
+  window["__payload_content_bundle_js"] = "1.0.1";
+  try { document.documentElement.setAttribute("data-nhs-payload", "1.0.1"); } catch (e) {}
 const quickStartOrderPage = () => {
   if (window.location.href.includes("manage/add") || window.location.href.includes("/edit")) {
     setTimeout(() => {
@@ -11,6 +11,21 @@ const quickStartOrderPage = () => {
       handleButtonSanPham();
       autoClickShippingAndVAT(); // Auto click Phí Vận chuyển và VAT 8%
     }, 1000); // Đợi 1 giây cho DOM render
+
+    // edit2 (Angular) render bảng sản phẩm chậm hơn 1s -> thử lại đến khi
+    // tạo được VAT box và gắn được observer cho Tổng tiền hàng / Phí ship
+    let tries = 0;
+    const retry = setInterval(() => {
+      tries++;
+      const ready =
+        document.querySelector("#tienVAT") &&
+        document.querySelector(".totalProductPrice[data-nhanh-vat-observed]");
+      if (ready || tries > 30) {
+        clearInterval(retry);
+        return;
+      }
+      handleTableChange();
+    }, 1000);
   }
 };
 
@@ -364,18 +379,34 @@ function registerOrderRow(row) {
 
 function addOrderCopyButton(orderId, link) {
   if (!link || link.parentElement.querySelector(`[data-order-copy="${orderId}"]`)) return;
+  // Layout mới: link mã đơn có class w-100 (chiếm cả dòng) -> icon bị đẩy xuống dòng dưới.
+  // Cho link rộng tự nhiên để icon nằm ngay sau mã đơn.
+  link.classList.remove("w-100");
+  link.style.setProperty("width", "auto", "important");
+  link.style.setProperty("display", "inline-block", "important");
+  link.style.setProperty("vertical-align", "middle", "important");
+
   const icon = document.createElement("span");
   icon.setAttribute("data-order-copy", orderId);
-  icon.textContent = "📋";
+  icon.innerHTML = svgCopyIcon(26);
   icon.title = "Copy mã đơn";
-  icon.style.cssText = "cursor:pointer;margin-left:6px;font-size:25px;line-height:1;";
+  icon.style.cssText = "cursor:pointer;margin-left:6px;display:inline-flex;align-items:center;vertical-align:middle;line-height:1;padding:2px;border-radius:4px;";
+  icon.addEventListener("mouseenter", () => { icon.style.background = "#e7f1ff"; });
+  icon.addEventListener("mouseleave", () => { icon.style.background = ""; });
   icon.addEventListener("click", e => {
     e.preventDefault();
+    e.stopPropagation();
     navigator.clipboard.writeText(orderId).then(() => {
-      showCopyToast(`Đã copy đơn ${orderId}`);
+      showCopyToast(`Đã copy đơn ${orderId}`, "success");
     });
   });
   link.insertAdjacentElement("afterend", icon);
+}
+
+// Icon copy dạng SVG inline — KHÔNG dùng emoji/FontAwesome vì giao diện Angular mới
+// của nhanh.vn không load font đó, icon hiển thị không đồng nhất
+function svgCopyIcon(size = 20, color = "#0d6efd") {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 }
 
 function getCopyAnchor(link) {
@@ -413,6 +444,7 @@ async function runOrderDetailContext() {
   }
 
   checkAndDisplayImageStatus(orderId).catch(() => { });
+  startUploadUIKeeper();
   observeAttachmentResourceLoads(orderId);
   installAttachmentUploadHooks(orderId);
   observeAttachmentPreviewModal(orderId);
@@ -607,147 +639,38 @@ function extractUploadedUrl(response) {
 function setupDragDropUpload() {
   if (document.getElementById("nhanhDropZoneWrapper")) return;
   const attachmentRoot = getAttachmentRoot();
-  if (!attachmentRoot) {
-    // Retry sau 1.5s nếu DOM chưa sẵn sàng
-    setTimeout(() => setupDragDropUpload(), 1500);
-    return;
-  }
-
+  if (!attachmentRoot) return;
   const dropZone = document.createElement("div");
   dropZone.id = "nhanhDropZoneWrapper";
   dropZone.innerHTML = `
-    <div id="nhanhDropZoneInner" style="border:2px dashed #4CAF50; border-radius:10px; padding:14px; margin:10px 0; text-align:center; background:#f8f9fa; transition:border-color .2s, background .2s;">
-        📤 <strong>Kéo thả</strong> hoặc <strong>dán ảnh (Ctrl/Cmd + V)</strong> để upload
+    <div style="border:2px dashed #aaa; padding:10px; margin:10px 0; text-align:center;">
+        📤 Kéo hình ảnh vào đây để upload
     </div>
-    <input id="pasteBoxDetailUpload" type="text"
-           placeholder="👉 Click vào đây rồi dán ảnh (Ctrl/Cmd + V)…"
-           style="margin-top:8px;padding:10px 12px;border:1px dashed #aaa;border-radius:6px;
-                  min-height:44px;background:#fff;outline:none;width:100%;box-sizing:border-box;
-                  font-size:14px;color:#555;cursor:text;transition:border-color .2s;" />
-    <div id="pastePreviewDetail" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
-    <div id="pasteStatusDetail" style="margin-top:6px;font-size:13px;color:#555;min-height:18px;"></div>
   `;
   attachmentRoot.prepend(dropZone);
 
-  const innerZone = document.getElementById("nhanhDropZoneInner");
-  const pastePreview = document.getElementById("pastePreviewDetail");
-  const pasteStatus = document.getElementById("pasteStatusDetail");
-
-  const setStatus = (text, color = "#555") => {
-    if (pasteStatus) { pasteStatus.textContent = text; pasteStatus.style.color = color; }
-  };
-
-  const renderPreview = (files) => {
-    if (!pastePreview) return;
-    pastePreview.innerHTML = "";
-    [...files].forEach(file => {
-      if (file.type.startsWith("image/")) {
-        const img = document.createElement("img");
-        img.style.cssText = "width:80px;height:80px;object-fit:cover;border:1px solid #ccc;border-radius:4px;";
-        const reader = new FileReader();
-        reader.onload = () => (img.src = reader.result);
-        reader.readAsDataURL(file);
-        pastePreview.appendChild(img);
-      } else {
-        const chip = document.createElement("div");
-        chip.style.cssText = "padding:6px 8px;border:1px solid #ccc;border-radius:4px;background:#fff;font-size:13px;";
-        chip.textContent = file.name;
-        pastePreview.appendChild(chip);
-      }
-    });
-  };
-
-  // Tìm native file input + nút Upload của Nhanh
-  const fileInput = getAttachmentFileInput();
-
-  const setFilesToNativeInput = (files) => {
-    if (!fileInput) {
-      console.warn("[NhanhExt] no native file input found on detail page");
-      return false;
-    }
-    const dt = new DataTransfer();
-    [...files].forEach(f => { if (f && f.size) dt.items.add(f); });
-    fileInput.files = dt.files;
-    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-    return dt.files.length > 0;
-  };
-
-
-  const doUpload = async (files) => {
-    setStatus("Đang upload…", "#0d6efd");
-    renderPreview(files);
-
-    // Đặt file vào native input → để Nhanh tự upload
-    const ok = setFilesToNativeInput(files);
-    if (ok) {
-      setStatus("✅ Đã chọn file, đang upload qua Nhanh…", "#198754");
-      // Sync thêm lên server ngoài (best-effort)
-      syncExternalUploads(files).catch(() => { });
-      // Reload sau 3s để cập nhật
-      setTimeout(() => {
-        setStatus("✅ Đang reload trang…", "#198754");
-        window.location.reload();
-      }, 3000);
-    } else {
-      // Fallback: upload trực tiếp nếu không tìm thấy native input
-      const orderId = new URLSearchParams(location.search).get("id");
-      if (!orderId) return alert("Không xác định được order_id");
-      try {
-        const result = await uploadOrderImages(orderId, files);
-        if (result.ok) {
-          setStatus("✅ Upload hoàn tất! Đang reload trang…", "#198754");
-          setTimeout(() => window.location.reload(), 1500);
-        } else {
-          setStatus("❌ Upload gặp lỗi, vui lòng thử lại.", "#dc3545");
-        }
-      } catch (err) {
-        console.warn("[NhanhExt] upload error", err);
-        setStatus("❌ Upload gặp lỗi, vui lòng thử lại.", "#dc3545");
-      }
-    }
-  };
-
-  // ===== Drag & Drop =====
   dropZone.addEventListener("dragover", e => {
     e.preventDefault();
-    if (innerZone) { innerZone.style.borderColor = "#2ecc71"; innerZone.style.background = "#e8f5e9"; }
+    dropZone.style.borderColor = "green";
   });
+
   dropZone.addEventListener("dragleave", () => {
-    if (innerZone) { innerZone.style.borderColor = "#4CAF50"; innerZone.style.background = "#f8f9fa"; }
+    dropZone.style.borderColor = "#aaa";
   });
+
   dropZone.addEventListener("drop", async e => {
     e.preventDefault();
-    if (innerZone) { innerZone.style.borderColor = "#4CAF50"; innerZone.style.background = "#f8f9fa"; }
-    const files = [...e.dataTransfer.files].filter(f => f.size > 0);
+    dropZone.style.borderColor = "#aaa";
+
+    const files = [...e.dataTransfer.files];
     if (!files.length) return;
-    doUpload(files);
+
+    const orderId = new URLSearchParams(location.search).get("id");
+    if (!orderId) return alert("Không xác định được order_id");
+
+    const result = await uploadOrderImages(orderId, files);
+    alert(result.ok ? "Đã upload xong, vui lòng reload trang." : "Upload gặp lỗi, vui lòng thử lại.");
   });
-
-  // ===== Paste Upload =====
-  const pasteBox = document.getElementById("pasteBoxDetailUpload");
-  if (pasteBox) {
-    pasteBox.addEventListener("focus", () => { pasteBox.style.borderColor = "#4CAF50"; });
-    pasteBox.addEventListener("blur", () => { pasteBox.style.borderColor = "#aaa"; });
-
-    pasteBox.addEventListener("paste", async (e) => {
-      const items = e.clipboardData?.items || [];
-      const picked = [];
-      for (const it of items) {
-        if (it.kind === "file") {
-          const blob = it.getAsFile();
-          if (!blob) continue;
-          const ext = blob.type.split("/")[1] || "png";
-          const fname = `paste_${Date.now()}_${picked.length}.${ext}`;
-          picked.push(new File([blob], fname, { type: blob.type }));
-        }
-      }
-      if (!picked.length) return;
-      e.preventDefault();
-      pasteBox.value = "";
-      console.warn("[NhanhExt] paste files (detail)", { count: picked.length, names: picked.map(f => f.name) });
-      doUpload(picked);
-    });
-  }
 }
 
 
@@ -918,7 +841,12 @@ function addQRCodeButton() {
     btn.innerText = "Tạo mã QR";
 
     // Debounced QR generation to avoid multiple API calls
-    btn.onclick = debounce(() => generateQRCode(orderId, amount, btn), 300);
+    const runGenerate = debounce(() => generateQRCode(orderId, amount, btn), 300);
+    btn.onclick = () => {
+      if (btn.disabled) return;
+      setQrButtonState(btn, "loading"); // báo ngay cho người dùng biết đã bấm
+      runGenerate();
+    };
 
     idCell.appendChild(document.createElement("br"));
     idCell.appendChild(btn);
@@ -926,10 +854,52 @@ function addQRCodeButton() {
 }
 
 
+// Trạng thái nút "Tạo mã QR": idle -> loading (đang gọi API) -> done / lỗi (trả về idle)
+function setQrButtonState(btn, state) {
+  if (!btn) return;
+  if (state === "loading") {
+    btn.disabled = true;
+    btn.style.opacity = "0.75";
+    btn.style.cursor = "wait";
+    btn.innerHTML = '<span class="nhanh-qr-spinner"></span> Đang tạo mã QR…';
+    ensureQrSpinnerStyle();
+  } else if (state === "done") {
+    btn.disabled = true;
+    btn.style.opacity = "1";
+    btn.style.cursor = "default";
+    btn.classList.remove("btn-warning");
+    btn.classList.add("btn-success");
+    btn.innerText = "✅ Đã tạo mã QR";
+  } else {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.style.cursor = "pointer";
+    btn.classList.remove("btn-success");
+    btn.classList.add("btn-warning");
+    btn.innerText = "Tạo mã QR";
+  }
+}
+
+function ensureQrSpinnerStyle() {
+  if (document.getElementById("nhanhQrSpinnerStyle")) return;
+  const style = document.createElement("style");
+  style.id = "nhanhQrSpinnerStyle";
+  style.textContent = `
+    .nhanh-qr-spinner {
+      display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px;
+      border: 2px solid rgba(0,0,0,0.25); border-top-color: #000; border-radius: 50%;
+      animation: nhanhQrSpin 0.7s linear infinite;
+    }
+    @keyframes nhanhQrSpin { to { transform: rotate(360deg); } }
+  `;
+  document.head.appendChild(style);
+}
+
 async function generateQRCode(orderId, amount, container) {
   const cacheKey = `${orderId}_${amount}`;
   // Avoid duplicate QR images (e.g. from rapid clicks)
   if (container.nextSibling && container.nextSibling.tagName === "IMG" && container.nextSibling.alt === "QR Code") {
+    setQrButtonState(container, "done");
     return;
   }
   if (qrCodeCache.has(cacheKey)) {
@@ -941,6 +911,7 @@ async function generateQRCode(orderId, amount, container) {
     img.style.maxWidth = "180px";
     img.classList.add("mt-2");
     container.insertAdjacentElement("afterend", img);
+    setQrButtonState(container, "done");
     return;
   }
 
@@ -967,11 +938,14 @@ async function generateQRCode(orderId, amount, container) {
       img.style.maxWidth = "180px";
       img.classList.add("mt-2");
       container.insertAdjacentElement("afterend", img);
+      setQrButtonState(container, "done");
     } else {
-      alert("Không tạo được mã QR, thử lại sau.");
+      setQrButtonState(container, "idle");
+      showCopyToast("Không tạo được mã QR, thử lại sau.", "error");
     }
   } catch (err) {
-    alert("Lỗi kết nối tới hệ thống tạo mã QR.");
+    setQrButtonState(container, "idle");
+    showCopyToast("Lỗi kết nối tới hệ thống tạo mã QR.", "error");
   }
 }
 
@@ -986,37 +960,40 @@ window.copyVAT = function (value, label = "Giá trị") {
   showCopyToast(`${label} đã copy: ${Number(value).toLocaleString("vi-VN")} đ`);
 };
 
-function showCopyToast(message) {
+function showCopyToast(message, type = "success") {
+  const colors = { success: "#198754", error: "#dc3545", info: "rgba(0, 0, 0, 0.85)" };
   let toast = document.getElementById("nhanhCopyToast");
   if (!toast) {
     toast = document.createElement("div");
     toast.id = "nhanhCopyToast";
     toast.style.cssText = `
       position: fixed;
-      top: 16px;
-      right: 16px;
+      top: 50%;
+      left: 50%;
       background: rgba(0, 0, 0, 0.85);
       color: #fff;
-      padding: 10px 16px;
-      border-radius: 6px;
-      font-size: 14px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 15px;
       z-index: 99999;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       opacity: 0;
-      transform: translateY(-10px);
-      transition: opacity .3s ease, transform .3s ease;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.95);
+      transition: opacity .25s ease, transform .25s ease;
     `;
     document.body.appendChild(toast);
   }
   toast.textContent = message;
+  toast.style.background = colors[type] || colors.success;
   requestAnimationFrame(() => {
     toast.style.opacity = "1";
-    toast.style.transform = "translateY(0)";
+    toast.style.transform = "translate(-50%, -50%) scale(1)";
   });
   clearTimeout(toast._hideTimer);
   toast._hideTimer = setTimeout(() => {
     toast.style.opacity = "0";
-    toast.style.transform = "translateY(-10px)";
+    toast.style.transform = "translate(-50%, -50%) scale(0.95)";
   }, 2000);
 }
 
@@ -1025,6 +1002,7 @@ function handleTableChange() {
   renderVatMetrics();
   initVatObservers();
   ensureSelfShippingChecked();
+  setupVatFillDelegation();
 }
 
 function ensureVatBox() {
@@ -1037,6 +1015,7 @@ function ensureVatBox() {
   div.style.padding = "0 12px";
   div.innerHTML = `
     VAT 8%: <span id='tienVAT'> 0đ </span> |
+    Quấn kiện: <span id='tienQuanKien'> 0đ </span> |
     VAT PVC: <span id='tienVatPVC'> 0đ </span>
   `;
   header.appendChild(div);
@@ -1065,14 +1044,170 @@ function ensureSelfShippingChecked() {
   checkbox.click();
 }
 
-function renderVatMetrics() {
+// Tổng tiền hàng CHƯA gồm các dòng VAT / Quấn kiện đang có trong đơn.
+// .totalProductPrice là tổng cả đơn (đã cộng dòng VAT), nếu lấy 8% của nó khi dòng VAT
+// đã có giá thì VAT bị đội lên (vd tổng 5.392.008 gồm VAT 399.408 -> 8% = 431.361 sai;
+// base 4.992.600 -> 8% = 399.408 đúng).
+function getVatBaseTotal() {
   const total = getTotalProductPrice();
+  let excluded = 0;
+  const rows = document.querySelectorAll("tr.productItem");
+  rows.forEach(row => {
+    const name = getEditRowProductName(row).toLowerCase();
+    if (!name.includes("vat") && !name.includes("quấn kiện")) return;
+    const table = row.closest("table");
+    let amountIdx = -1;
+    if (table) {
+      const ths = table.querySelectorAll("thead tr:first-child th");
+      for (let i = 0; i < ths.length; i++) {
+        const t = (ths[i].textContent || "").trim().toLowerCase();
+        if (t.startsWith("tiền hàng") || t.startsWith("thành tiền")) { amountIdx = i; break; }
+      }
+    }
+    const tds = row.querySelectorAll(":scope > td");
+    const cell = amountIdx >= 0 ? tds[amountIdx] : null;
+    if (cell) excluded += parseMoney(cell.textContent);
+  });
+  return Math.max(0, total - excluded);
+}
+
+function renderVatMetrics() {
+  const total = getVatBaseTotal();
   const vat = Math.round(0.08 * total);
+  const quanKien = Math.round(0.02 * total);
   const pvcFee = getPvcFee();
   const vatPVC = Math.round(0.08 * (total + pvcFee));
 
   updateVatLine("tienVAT", vat, "btnCopyVAT", "VAT 8%", "color:green;");
+  updateVatLine("tienQuanKien", quanKien, "btnCopyQuanKien", "Quấn kiện 2%", "color:orange;");
   updateVatLine("tienVatPVC", vatPVC, "btnCopyVatPVC", "VAT PVC", "color:#6f42c1;");
+  renderVatFillButtons(vat, quanKien, vatPVC);
+}
+
+// =================== PUSH VAT VÀO Ô GIÁ (trang Sửa/Thêm đơn) ===================
+// Chỉ tính VAT 8% / Quấn kiện 2% từ Tổng tiền hàng và điền vào ô Giá bán của dòng tương ứng.
+function svgFillIcon(size = 18, color = "#198754") {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>`;
+}
+
+function getEditRowProductName(row) {
+  const nameCell = row.querySelector(".colName") || row.querySelector("td:nth-child(2)");
+  if (!nameCell) return "";
+  const named = nameCell.querySelector(".productName, a, p[title='Mã sản phẩm']");
+  if (named) return named.textContent.trim();
+  return nameCell.textContent.trim().split("\n")[0].trim();
+}
+
+function isEditPriceInput(inp) {
+  if (!inp || inp.disabled || inp.readOnly) return false;
+  if (inp.type === "hidden" || inp.type === "checkbox" || inp.type === "radio") return false;
+  // Bỏ qua ô chọn VAT giả (fakeInput) nằm chung cột Giá bán trong layout edit2
+  if (inp.classList.contains("fakeInput")) return false;
+  const ph = (inp.getAttribute("placeholder") || "").toLowerCase();
+  if (ph.includes("ghi chú") || ph.includes("chiết khấu")) return false;
+  return true;
+}
+
+// Tìm ô input "Giá bán" theo tiêu đề bảng (layout edit2 đã đổi thứ tự: Giá bán đứng trước SL)
+function getEditRowPriceInput(row) {
+  if (!row) return null;
+  const table = row.closest("table");
+  if (table) {
+    const ths = table.querySelectorAll("thead tr:first-child th");
+    let priceIdx = -1;
+    for (let i = 0; i < ths.length; i++) {
+      const t = (ths[i].textContent || "").trim().toLowerCase();
+      if (t.startsWith("giá bán")) { priceIdx = i; break; }
+    }
+    if (priceIdx >= 0) {
+      const tds = row.querySelectorAll(":scope > td");
+      const priceTd = tds[priceIdx];
+      const inp = priceTd && Array.from(priceTd.querySelectorAll("input")).find(isEditPriceInput);
+      if (inp) return inp;
+    }
+  }
+  // Layout cũ
+  const legacy = row.querySelector("td:nth-child(5) input") || row.querySelector("td:nth-child(4) input");
+  return legacy && isEditPriceInput(legacy) ? legacy : null;
+}
+
+// Điền giá vào input Angular qua inject.js (MAIN world) — gõ từng ký tự để AutoNumeric nhận
+function setAngularInputValue(input, value) {
+  const marker = "nhanh-ext-fill-" + Date.now();
+  input.setAttribute("data-nhanh-fill", marker);
+  window.dispatchEvent(new CustomEvent("nhanh-ext-fill-price", {
+    detail: { marker, value: String(value) }
+  }));
+}
+
+function renderVatFillButtons(vat, quanKien, vatPVC) {
+  const rows = document.querySelectorAll("tr.productItem");
+  rows.forEach(row => {
+    const name = getEditRowProductName(row);
+    if (!name) return;
+    const lower = name.toLowerCase();
+
+    // Mỗi dòng có thể có nhiều option push: dòng VAT -> [VAT 8%, VAT PVC]; dòng Quấn kiện -> [Quấn kiện 2%]
+    let options = [];
+    if (lower.includes("vat")) {
+      options = [
+        { key: "vat", label: "VAT 8%", value: vat, color: "#198754" },
+        { key: "vatpvc", label: "VAT PVC", value: vatPVC, color: "#6f42c1" }
+      ];
+    } else if (lower.includes("quấn kiện")) {
+      options = [{ key: "quankien", label: "Quấn kiện 2%", value: quanKien, color: "#fd7e14" }];
+    }
+    if (!options.length) return;
+
+    const nameCell = row.querySelector(".colName") || row.querySelector("td:nth-child(2)");
+    if (!nameCell) return;
+    const container = nameCell.querySelector(".d-flex > div") || nameCell;
+
+    let wrap = nameCell.querySelector(".nhanh-vat-fill-wrap");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.className = "nhanh-vat-fill-wrap";
+      wrap.style.cssText = "display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;";
+      container.appendChild(wrap);
+    }
+
+    options.forEach(opt => {
+      let btn = wrap.querySelector(`.nhanh-vat-fill[data-key="${opt.key}"]`);
+      if (!btn) {
+        btn = document.createElement("span");
+        btn.className = "nhanh-vat-fill";
+        btn.dataset.key = opt.key;
+        btn.style.cssText = `display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border:1px solid ${opt.color};border-radius:4px;color:${opt.color};font-size:12px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;`;
+        wrap.appendChild(btn);
+      }
+      btn.dataset.value = opt.value;
+      btn.dataset.label = opt.label;
+      btn.title = "Điền " + opt.label + " vào ô Giá bán";
+      btn.innerHTML = svgFillIcon(16, opt.color) + "<span>Push " + opt.label + ": " + Number(opt.value).toLocaleString("vi-VN") + " đ</span>";
+    });
+  });
+}
+
+let vatFillDelegationBound = false;
+function setupVatFillDelegation() {
+  if (vatFillDelegationBound) return;
+  vatFillDelegationBound = true;
+  document.addEventListener("click", e => {
+    const btn = e.target.closest(".nhanh-vat-fill");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const row = btn.closest("tr.productItem");
+    if (!row) return;
+    const priceInput = getEditRowPriceInput(row);
+    if (!priceInput) {
+      showCopyToast("Không tìm thấy ô Giá bán!", "error");
+      return;
+    }
+    const value = parseInt(btn.dataset.value || "0", 10) || 0;
+    setAngularInputValue(priceInput, value);
+    showCopyToast("Đã điền " + btn.dataset.label + ": " + value.toLocaleString("vi-VN") + " đ");
+  }, true);
 }
 
 function parseMoney(value) {
@@ -1088,11 +1223,26 @@ function getTotalProductPrice() {
 }
 
 function findPvcInput() {
-  return (
+  // Layout cũ: input có id / placeholder
+  const direct =
     document.querySelector("#customerShipFee") ||
     document.querySelector("input[placeholder='Phí ship báo khách']") ||
-    document.querySelector("input[placeholder*='Phí ship']")
-  );
+    document.querySelector("input[placeholder*='Phí ship']");
+  if (direct) return direct;
+
+  // Layout mới (edit2): input nằm trong .form-floating, label "Phí ship báo khách", placeholder rỗng
+  const labels = document.querySelectorAll("label");
+  for (const label of labels) {
+    if (!(label.textContent || "").trim().toLowerCase().includes("phí ship báo khách")) continue;
+    if (label.htmlFor) {
+      const byFor = document.getElementById(label.htmlFor);
+      if (byFor && byFor.tagName === "INPUT") return byFor;
+    }
+    const wrap = label.closest(".form-floating") || label.closest(".input-group") || label.parentElement;
+    const input = wrap && wrap.querySelector("input[type='text'], input:not([type='hidden']):not([type='checkbox'])");
+    if (input) return input;
+  }
+  return null;
 }
 
 function getPvcFee() {
@@ -1118,6 +1268,7 @@ function updateVatLine(spanId, value, btnId, label, colorStyle) {
 
 let arrayAvailable = {
   "Phí Vận chuyển": "Phí Vận Chuyển",
+  "Quấn kiện 2%": "Phí quấn kiện 2%",
   "VAT 8%": "VAT 8%",
 }
 
@@ -1151,13 +1302,35 @@ function availableItem() {
   handleButtonSanPham();
 }
 
+const PRODUCT_COMPONENT_SELECTOR = "app-product-add-order, app-product-add-order-v3, [class*='product-add-order']";
+
 function findProductHeader() {
+  // Layout cũ: app-product-add-order > .card-header > .card-title "Sản phẩm"
   const candidates = document.querySelectorAll("app-product-add-order .card-header");
   for (const header of candidates) {
     const title = header.querySelector(".card-title");
     if (title && title.textContent.includes("Sản phẩm")) {
       return header;
     }
+  }
+
+  // Layout mới (edit2, app-product-add-order-v3): tiêu đề "Sản phẩm" là tab trong
+  // ul.nav-tabs nằm trong .left-header-product, không còn .card-header
+  const leftHeader = document.querySelector(".left-header-product");
+  if (leftHeader) return leftHeader;
+
+  const titles = document.querySelectorAll(PRODUCT_COMPONENT_SELECTOR + " .card-title, .left-header-product .card-title");
+  for (const t of titles) {
+    if (!(t.textContent || "").includes("Sản phẩm")) continue;
+    const container = t.closest(".card-header") || t.closest(".left-header-product") || t.closest(".border-bottom") || t.closest(".card");
+    if (container) return container;
+  }
+
+  // Fallback: chèn ngay trước bảng sản phẩm
+  const table = document.querySelector("table.tableProduct");
+  if (table) {
+    const wrap = table.closest("app-c-table") || table.parentElement;
+    if (wrap && wrap.parentElement) return wrap.parentElement;
   }
   return document.querySelector("app-product-add-order .card-header");
 }
@@ -1264,8 +1437,6 @@ function autoClickShippingAndVAT() {
 }
 
 function injectCustomUploadZone() {
-  // Bỏ qua nếu setupDragDropUpload() đã tạo zone trên trang detail
-  if (document.getElementById('nhanhDropZoneWrapper')) return;
   const fileInput = getAttachmentFileInput();
   if (!fileInput || fileInput.closest('#customUploadZone')) return;
 
@@ -1398,16 +1569,11 @@ function injectCustomUploadZone() {
       } else {
         hideProgress();
       }
-      setStatus(detail.ok ? 'Upload hoàn tất' : 'Upload thất bại', detail.ok ? '#198754' : '#dc3545');
+      setStatus(detail.ok ? 'Upload hoàn tất' : ('Upload thất bại' + (detail.text ? ': ' + detail.text : '')), detail.ok ? '#198754' : '#dc3545');
       if (detail.ok) {
         triggerAttachmentSyncFromUpload();
-        console.warn("[NhanhExt] scheduling reload after upload");
-        setTimeout(() => {
-          window.location.reload();
-          setTimeout(() => {
-            window.location.href = window.location.href;
-          }, 800);
-        }, 1500);
+        console.warn("[NhanhExt] upload done, reload when Nhanh upload settles");
+        scheduleReloadAfterUpload(fileInput.files && fileInput.files.length ? fileInput.files : [true]);
         setTimeout(() => {
           if (statusLine.textContent === 'Upload hoàn tất') {
             setStatus('Đã sẵn sàng cho lần upload tiếp theo.');
@@ -1474,17 +1640,15 @@ function injectCustomUploadZone() {
       return;
     }
     scheduleReloadAfterUpload(e.target.files);
-    window.dispatchEvent(new CustomEvent('nhanhUploadStatus', { detail: { state: 'start', text: 'Đang đồng bộ ảnh…' } }));
+    window.dispatchEvent(new CustomEvent('nhanhUploadStatus', { detail: { state: 'start', text: 'Đang tải lên Nhanh…' } }));
+    // Đồng bộ ảnh sang server ngoài chạy song song; lỗi ở đây không làm upload Nhanh "thất bại"
     syncExternalUploads(e.target.files)
       .then(result => {
         console.warn("[NhanhExt] sync external uploads done", result);
-        // Luôn báo thành công vì Nhanh đã upload xong, sync server ngoài chỉ là phụ
-        window.dispatchEvent(new CustomEvent('nhanhUploadStatus', { detail: { state: 'done', ok: true } }));
+        if (!result.ok) console.warn("[NhanhExt] external image sync failed (Nhanh upload unaffected)");
       })
-      .catch(() => {
-        console.warn("[NhanhExt] sync external uploads failed (best-effort)");
-        // Vẫn báo thành công vì upload chính qua Nhanh đã OK
-        window.dispatchEvent(new CustomEvent('nhanhUploadStatus', { detail: { state: 'done', ok: true } }));
+      .catch(err => {
+        console.warn("[NhanhExt] sync external uploads failed", err);
       });
   });
 
@@ -1543,20 +1707,80 @@ function triggerAttachmentSyncFromUpload() {
   setTimeout(() => autoFetchAttachmentUrls(orderId), 800);
 }
 
+// Theo dõi số request upload của Nhanh đang chạy (presign / attachment / upload).
+// Layout mới (Angular) upload qua 2 bước: POST /media/presign/geturl -> POST /media/presign/attachment,
+// ảnh vài MB mất nhiều hơn 2.5s, nên KHÔNG được reload cứng theo timer như trước
+// (reload cắt ngang request -> file không bao giờ được đính kèm).
+window.__nhanhUploadInFlight = window.__nhanhUploadInFlight || 0;
+window.__nhanhUploadLastDone = window.__nhanhUploadLastDone || 0;
+
+// Tín hiệu từ inject.js (MAIN world): request upload của Nhanh bắt đầu / kết thúc / tiến độ
+if (!window.__nhanhUploadActivityBound) {
+  window.__nhanhUploadActivityBound = true;
+  window.addEventListener("nhanh-ext-upload-activity", e => {
+    const d = e.detail || {};
+    if (d.state === "start") {
+      window.__nhanhUploadInFlight = (window.__nhanhUploadInFlight || 0) + 1;
+      if (d.kind === "presign" || d.kind === "bytes" || d.kind === "other") {
+        window.dispatchEvent(new CustomEvent("nhanhUploadStatus", { detail: { state: "start", text: "Đang tải lên Nhanh…" } }));
+      }
+      return;
+    }
+    if (d.state === "progress" && d.total) {
+      const pct = Math.round((d.loaded / d.total) * 100);
+      window.dispatchEvent(new CustomEvent("nhanhUploadStatus", { detail: { state: "progress", pct } }));
+      return;
+    }
+    if (d.state === "end") {
+      window.__nhanhUploadInFlight = Math.max(0, (window.__nhanhUploadInFlight || 1) - 1);
+      window.__nhanhUploadLastDone = Date.now();
+      console.warn("[NhanhExt] nhanh upload request end", d.kind, d.ok, d.message || "");
+      if (!d.ok) {
+        window.dispatchEvent(new CustomEvent("nhanhUploadStatus", { detail: { state: "done", ok: false, text: d.message || "" } }));
+      } else if (d.kind === "confirm" || d.kind === "other") {
+        window.dispatchEvent(new CustomEvent("nhanhUploadStatus", { detail: { state: "done", ok: true } }));
+      }
+    }
+  });
+}
+
 function scheduleReloadAfterUpload(files) {
   if (!files || !files.length) return;
   if (window.__nhanhUploadReloadScheduled) return;
   window.__nhanhUploadReloadScheduled = true;
-  console.warn("[NhanhExt] scheduling reload after upload (fallback)");
-  const forceReload = () => {
-    console.warn("[NhanhExt] forcing reload");
+  const startedAt = Date.now();
+  const MAX_WAIT_MS = 120000; // fallback cuối cùng nếu không bắt được request upload
+  console.warn("[NhanhExt] waiting for upload to finish before reload");
+
+  const doReload = reason => {
+    console.warn("[NhanhExt] reloading after upload:", reason);
     window.location.reload();
     setTimeout(() => window.location.assign(window.location.href), 500);
-    setTimeout(() => window.location.replace(window.location.href), 900);
   };
-  setTimeout(forceReload, 2500);
-  setTimeout(forceReload, 5000);
-  setTimeout(forceReload, 8000);
+
+  const timer = setInterval(() => {
+    const elapsed = Date.now() - startedAt;
+    const inFlight = window.__nhanhUploadInFlight > 0;
+    const sawUpload = window.__nhanhUploadLastDone >= startedAt;
+    const settledFor = Date.now() - window.__nhanhUploadLastDone;
+
+    // Đã có request upload hoàn tất và không còn request nào đang chạy -> reload
+    if (!inFlight && sawUpload && settledFor >= 1200) {
+      clearInterval(timer);
+      doReload("upload finished");
+      return;
+    }
+    // Không bắt được request upload nào (ví dụ layout khác) -> chờ 8s rồi reload như cũ
+    if (!inFlight && !sawUpload && elapsed >= 8000) {
+      clearInterval(timer);
+      doReload("no upload request detected, fallback");
+      return;
+    }
+    if (elapsed >= MAX_WAIT_MS) {
+      clearInterval(timer);
+      doReload("max wait reached");
+    }
+  }, 300);
 }
 
 function ensureUploadProgressStyle() {
@@ -1791,6 +2015,31 @@ function getAttachmentTable() {
 function getAttachmentFileInput() {
   const root = getAttachmentRoot();
   return root?.querySelector("input[type='file']") || null;
+}
+
+// Nhanh.vn là SPA (Angular): khung "File đính kèm" render trễ hơn sự kiện load,
+// và còn bị Angular render lại (xoá sạch DOM đã gắn) khi dữ liệu đơn hàng về.
+// Vì vậy phải kiểm tra định kỳ và gắn lại UI upload mỗi khi nó bị xoá.
+function ensureUploadUI() {
+  const fileInput = getAttachmentFileInput();
+  if (!fileInput) return;
+
+  // Angular re-render tạo input mới → wrapper cũ (chứa input cũ đã chết) phải bỏ đi
+  const zone = document.getElementById("customUploadZone");
+  if (zone && !zone.contains(fileInput)) {
+    console.warn("[NhanhExt] upload zone detached by re-render, re-injecting");
+    zone.remove();
+  }
+
+  setupDragDropUpload();
+  injectCustomUploadZone();
+  setupUploadProgressUI();
+}
+
+function startUploadUIKeeper() {
+  if (window.__nhanhUploadUIKeeper) return;
+  window.__nhanhUploadUIKeeper = setInterval(ensureUploadUI, 1000);
+  ensureUploadUI();
 }
 
 function getAttachmentImageUrlFromRow(row) {
@@ -2523,6 +2772,14 @@ function setupUploadProgressUI() {
       const hasFileField = isFormData && [...body.keys()].some(k => /file|upload|attach|attachment|image|anh/i.test(k));
       const isCandidate = isPost && (isFormData || /upload|attach|file|attachment/i.test(this.__nhanhMeta.url));
 
+      if (isCandidate) {
+        window.__nhanhUploadInFlight = (window.__nhanhUploadInFlight || 0) + 1;
+        this.addEventListener('loadend', () => {
+          window.__nhanhUploadInFlight = Math.max(0, (window.__nhanhUploadInFlight || 1) - 1);
+          window.__nhanhUploadLastDone = Date.now();
+        });
+      }
+
       if (isCandidate && this.upload) {
         stopIndeterminateFallback();
         showHUD('Đang tải lên máy chủ…');
@@ -2577,9 +2834,7 @@ function setupUploadProgressUI() {
 }
 
 // KHỞI ĐỘNG
-window.addEventListener('load', () => {
-  setTimeout(injectCustomUploadZone, 1000);
-  setTimeout(setupUploadProgressUI, 1000);
-});
+if (document.readyState === 'complete') startUploadUIKeeper();
+else window.addEventListener('load', () => startUploadUIKeeper());
 
 })();
