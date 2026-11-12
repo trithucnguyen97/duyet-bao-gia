@@ -1,19 +1,19 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minShell": "3.0.0",
   "files": [
     {
       "file": "content.bundle.js",
       "world": "USER_SCRIPT",
-      "sha256": "ccea35b4621af1bf5da28fb3c86f56c02a63481bba9ee9a5eb30f44129e660ad"
+      "sha256": "39e0782eff87274dc006c3d2bb2b1a98de2676ca712c8908092e0ef8103d36f9"
     },
     {
       "file": "inject.bundle.js",
       "world": "MAIN",
-      "sha256": "802a328206a8cdab4433e086aa574012f4b61d1af2cc1fc5317792b36762f5f9"
+      "sha256": "2fc13462ed5442c582761ec783cd7c31d74631e7ce57b92e61727764c3cbf863"
     }
   ],
-  "sig": "SurV3zofNZNv5rAHueya1etjfyFn6a3pJIX46/m9eR4x7F/NlMc1zVFDW0Xp3KS/GNyD3vfHwELdyWKyrA7w5w==",
-  "shell": "3.0.0",
-  "builtAt": "2026-11-12T06:32:47.229Z"
+  "sig": "yiUFRrHbggcNNBIrWB5FxXTAnnM+UvLoW3ZL/Fpriuu/oQmAvAAhOFiopPnZ9cqncpO+1jxn8rBCgYrZkSzhRQ==",
+  "shell": "3.1.0",
+  "builtAt": "2026-11-12T07:17:55.918Z"
 }

@@ -1,8 +1,8 @@
-/* Nhanh vn Đại Dương (Sale) — content.bundle.js v1.0.1 (đã ký; build 2026-11-12T06:32:47.066Z) */
+/* Nhanh vn Đại Dương (Sale) — content.bundle.js v1.0.2 (đã ký; build 2026-11-12T07:17:55.757Z) */
 (function () {
   if (window["__payload_content_bundle_js"]) return;
-  window["__payload_content_bundle_js"] = "1.0.1";
-  try { document.documentElement.setAttribute("data-nhs-payload", "1.0.1"); } catch (e) {}
+  window["__payload_content_bundle_js"] = "1.0.2";
+  try { document.documentElement.setAttribute("data-nhs-payload", "1.0.2"); } catch (e) {}
 const quickStartOrderPage = () => {
   if (window.location.href.includes("manage/add") || window.location.href.includes("/edit")) {
     setTimeout(() => {
@@ -2836,5 +2836,341 @@ function setupUploadProgressUI() {
 // KHỞI ĐỘNG
 if (document.readyState === 'complete') startUploadUIKeeper();
 else window.addEventListener('load', () => startUploadUIKeeper());
+
+// ================== BẢNG GIÁ THEO KHÁCH ==================
+// Đơn đang soạn có SĐT khách đã lưu trong Bảng giá -> hiện dải "Bảng giá KH" phía trên bảng sản phẩm
+// và dòng "Giá KH" dưới tên từng sản phẩm (bấm để copy, nút mũi tên để điền vào ô Giá bán).
+// Dữ liệu hỏi qua phần vỏ (từ v3.1.0) bằng mã kết nối riêng của từng người, chỉ giữ trong bộ nhớ của trang.
+const KH_LOOKUP_TTL_MS = 5 * 60 * 1000;   // mỗi SĐT tra lại sau 5 phút để nhận số vừa thêm trên Bảng giá
+const KH_TABLE_TTL_MS = 10 * 60 * 1000;   // bảng giá của khách tải lại sau 10 phút
+const KH_RETRY_MS = 30 * 1000;            // hỏi không được (mất mạng, máy chủ bận) thì 30 giây sau thử lại
+const KH_BANNER_ID = "nhanhKhPriceBanner";
+const KH_HINT_ID = "nhanhKhShellHint";
+const KH_HINT_SEEN_KEY = "nhanh-ext-kh-shell-hint-seen";
+const KH_PRODUCT_CODE_RE = /^\([A-Za-z0-9_.\-]+\)$/;   // "(TP01649)"
+const khLookups = new Map();   // SĐT -> { at, pending, customer }
+const khTables = new Map();    // id khách -> { at, pending, loaded, byName }
+
+function khCanAsk() {
+  try {
+    return typeof chrome !== "undefined" && !!chrome.runtime && typeof chrome.runtime.sendMessage === "function";
+  } catch (e) {
+    return false;
+  }
+}
+
+function khAsk(message) {
+  return new Promise(resolve => {
+    try {
+      chrome.runtime.sendMessage(message, response => {
+        try { void chrome.runtime.lastError; } catch (e) { /* phần vỏ vừa nạp lại */ }
+        resolve(response || null);
+      });
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+function khOnOrderForm() {
+  const href = window.location.href;
+  return href.includes("/order/manage/add") || href.includes("/order/manage/edit");
+}
+
+function khDetectPhone() {
+  const input = document.querySelector('app-c-suggest-customer input[placeholder*="iện thoại"]');
+  if (!input) return "";
+  const raw = (input.value || "").replace(/[\s\-.]/g, "");
+  return /^0[1-9]\d{8,9}$/.test(raw) ? raw : "";
+}
+
+// Chuẩn hóa tên để so khớp: Nhanh có tên dùng dấu nhân "×", Bảng giá dùng chữ "x"; bỏ mã SP nối sau tên
+function khNormalizeName(name) {
+  return String(name || "")
+    .replace(/\s*\([A-Za-z0-9_.\-]+\)\s*$/, "")
+    .replace(/[×✕✖]/g, "x")
+    .replace(/\s*x\s*/gi, " x ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+// Tên sản phẩm của một dòng: layout cũ để tên trong p[title='Mã sản phẩm'], layout mới thẻ đó chứa MÃ "(TP01649)"
+function khProductName(cell) {
+  const codeP = cell.querySelector("p[title='Mã sản phẩm']");
+  if (codeP) {
+    const t = codeP.textContent.trim();
+    if (t && !KH_PRODUCT_CODE_RE.test(t)) return t;
+  }
+  const nameP = Array.from(cell.querySelectorAll("p")).find(el => {
+    const t = el.textContent.trim();
+    return t && el.getAttribute("title") !== "Mã sản phẩm" && !KH_PRODUCT_CODE_RE.test(t);
+  });
+  if (nameP) return nameP.textContent.trim();
+  const link = cell.querySelector("a[href*='/product/item/detail']");
+  if (link) return link.textContent.trim();
+  const named = cell.querySelector(".productName");
+  if (named) return named.textContent.trim();
+  return cell.textContent.trim().split("\n")[0].trim();
+}
+
+function khCustomerFor(phone) {
+  let entry = khLookups.get(phone);
+  if (entry && (entry.pending || Date.now() - entry.at < KH_LOOKUP_TTL_MS)) return entry.customer;
+  entry = { pending: true, at: Date.now(), customer: entry ? entry.customer : null };
+  khLookups.set(phone, entry);
+  khAsk({ action: "nhs:khByPhone", phone }).then(res => {
+    entry.pending = false;
+    entry.at = Date.now();
+    if (res && res.ok) {
+      const c = res.customer;
+      entry.customer = c && Number.isInteger(c.id) && c.id > 0
+        ? { id: c.id, name: String(c.name || ""), url: /^https:\/\//.test(String(c.url || "")) ? String(c.url) : "" }
+        : null;
+    } else if (res && (res.error === "NOT_CONNECTED" || res.error === "FORBIDDEN")) {
+      entry.customer = null;
+    } else {
+      // Lỗi mạng / máy chủ: giữ kết quả cũ, thử lại sớm
+      entry.at = Date.now() - KH_LOOKUP_TTL_MS + KH_RETRY_MS;
+    }
+    khTick();
+  });
+  return entry.customer;
+}
+
+function khTableFor(customerId) {
+  let table = khTables.get(customerId);
+  if (table && (table.pending || Date.now() - table.at < KH_TABLE_TTL_MS)) return table;
+  table = { pending: true, at: Date.now(), loaded: table ? table.loaded : false, byName: table ? table.byName : {} };
+  khTables.set(customerId, table);
+  khAsk({ action: "nhs:khPrices", customerId }).then(res => {
+    table.pending = false;
+    table.at = Date.now();
+    if (res && res.ok && res.prices && typeof res.prices === "object") {
+      const byName = {};
+      Object.keys(res.prices).forEach(name => {
+        const value = Number(res.prices[name]);
+        if (value > 0) byName[khNormalizeName(name)] = value;
+      });
+      table.byName = byName;
+      table.loaded = true;
+    } else if (res && (res.error === "NOT_CONNECTED" || res.error === "FORBIDDEN")) {
+      table.byName = {};
+      table.loaded = false;
+    } else {
+      table.at = Date.now() - KH_TABLE_TTL_MS + KH_RETRY_MS;
+    }
+    khTick();
+  });
+  return table;
+}
+
+function khInsertAboveProducts(el) {
+  const productApp = document.querySelector(PRODUCT_COMPONENT_SELECTOR);
+  if (productApp && productApp.parentElement) {
+    productApp.parentElement.insertBefore(el, productApp);
+    return true;
+  }
+  const header = findProductHeader();
+  const card = header && header.closest(".card");
+  if (card) {
+    card.insertAdjacentElement("beforebegin", el);
+    return true;
+  }
+  return false;
+}
+
+function khRenderBanner(customer, table) {
+  let el = document.getElementById(KH_BANNER_ID);
+  if (!customer) {
+    if (el) el.remove();
+    return;
+  }
+  const key = customer.id + "|" + customer.name + "|" + customer.url;
+  if (el && el.dataset.khKey !== key) {
+    el.remove();
+    el = null;
+  }
+  if (!el) {
+    el = document.createElement("div");
+    el.id = KH_BANNER_ID;
+    el.dataset.khKey = key;
+    el.style.cssText = "background:linear-gradient(135deg,#0d6efd,#0b5ed7);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;display:flex;align-items:center;gap:12px;margin:8px 12px;box-shadow:0 2px 8px rgba(13,110,253,.3);";
+    const icon = document.createElement("span");
+    icon.textContent = "📋";
+    icon.style.fontSize = "22px";
+    const body = document.createElement("div");
+    body.style.flex = "1";
+    const title = document.createElement("div");
+    title.style.cssText = "font-weight:bold;font-size:15px;";
+    // Tên khách do người dùng nhập ở Bảng giá -> chỉ gán bằng textContent
+    title.textContent = "Bảng giá KH: " + customer.name;
+    const sub = document.createElement("div");
+    sub.className = "nhanh-kh-banner-sub";
+    sub.style.cssText = "font-size:12px;opacity:.9;";
+    body.append(title, sub);
+    el.append(icon, body);
+    if (customer.url) {
+      const link = document.createElement("a");
+      link.href = customer.url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Mở bảng giá ↗";
+      link.style.cssText = "color:#fff;text-decoration:none;background:rgba(255,255,255,.2);padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;white-space:nowrap;";
+      el.appendChild(link);
+    }
+    if (!khInsertAboveProducts(el)) return;   // bảng sản phẩm chưa dựng xong -> lần sau thử lại
+  }
+  const sub = el.querySelector(".nhanh-kh-banner-sub");
+  const text = table.loaded
+    ? "Giá KH hiện dưới tên từng sản phẩm. Bấm vào giá để copy, bấm nút mũi tên để điền vào ô Giá bán."
+    : (table.pending ? "Đang tải bảng giá của khách…" : "Chưa tải được bảng giá của khách, sẽ tự thử lại.");
+  if (sub && sub.textContent !== text) sub.textContent = text;
+}
+
+function khRenderRows(table) {
+  document.querySelectorAll("tr.productItem").forEach(row => {
+    const nameCell = row.querySelector(".colName") || row.querySelector("td:nth-child(2)");
+    if (!nameCell) return;
+    let box = nameCell.querySelector(".nhanh-kh-price");
+    let price = 0;
+    if (table && table.loaded) {
+      const name = khProductName(nameCell);
+      const lower = name.toLowerCase();
+      // Dòng VAT / Quấn kiện đã có nút Push riêng
+      if (name && !lower.includes("vat") && !lower.includes("quấn kiện")) price = table.byName[khNormalizeName(name)] || 0;
+    }
+    if (!(price > 0)) {
+      if (box) box.remove();
+      return;
+    }
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "nhanh-kh-price mt-1";
+      box.style.cssText = "font-size:15px;line-height:1.4;";
+      const label = document.createElement("span");
+      label.className = "nhanh-kh-value";
+      label.style.cssText = "color:#0d6efd;font-weight:bold;cursor:pointer;";
+      label.title = "Bấm để copy giá KH";
+      const iconStyle = "margin-left:6px;cursor:pointer;user-select:none;display:inline-flex;vertical-align:middle;";
+      const copy = document.createElement("span");
+      copy.className = "nhanh-kh-copy";
+      copy.title = "Copy giá KH";
+      copy.style.cssText = iconStyle;
+      copy.innerHTML = svgCopyIcon(20);
+      const fill = document.createElement("span");
+      fill.className = "nhanh-kh-fill";
+      fill.title = "Điền giá KH vào ô Giá bán";
+      fill.style.cssText = iconStyle;
+      fill.innerHTML = svgFillIcon(20);
+      box.append(label, copy, fill);
+      (nameCell.querySelector(".d-flex > div") || nameCell).appendChild(box);
+    }
+    if (box.dataset.khValue !== String(price)) {
+      box.dataset.khValue = String(price);
+      box.querySelector(".nhanh-kh-value").textContent = "Giá KH: " + price.toLocaleString("vi-VN") + " đ";
+    }
+  });
+}
+
+let khDelegationBound = false;
+function khSetupDelegation() {
+  if (khDelegationBound) return;
+  khDelegationBound = true;
+  document.addEventListener("click", e => {
+    const box = e.target.closest && e.target.closest(".nhanh-kh-price");
+    if (!box) return;
+    const value = parseInt(box.dataset.khValue || "0", 10) || 0;
+    if (!value) return;
+    if (e.target.closest(".nhanh-kh-fill")) {
+      e.preventDefault();
+      e.stopPropagation();
+      const priceInput = getEditRowPriceInput(box.closest("tr.productItem"));
+      if (!priceInput) {
+        showCopyToast("Không tìm thấy ô Giá bán!", "error");
+        return;
+      }
+      setAngularInputValue(priceInput, value);
+      showCopyToast("Đã điền giá KH: " + value.toLocaleString("vi-VN") + " đ");
+      return;
+    }
+    if (e.target.closest(".nhanh-kh-copy") || e.target.closest(".nhanh-kh-value")) {
+      e.preventDefault();
+      e.stopPropagation();
+      navigator.clipboard.writeText(String(value))
+        .then(() => showCopyToast("Giá KH đã copy: " + value.toLocaleString("vi-VN") + " đ"))
+        .catch(() => showCopyToast("Không copy được", "error"));
+    }
+  }, true);
+}
+
+// Phần vỏ cũ (trước v3.1.0) không hỏi được Bảng giá: nhắc một lần là cần cài lại bản mới
+function khRenderShellHint(show) {
+  let el = document.getElementById(KH_HINT_ID);
+  let seen = false;
+  try { seen = !!localStorage.getItem(KH_HINT_SEEN_KEY); } catch (e) { seen = true; }
+  if (!show || seen) {
+    if (el) el.remove();
+    return;
+  }
+  if (el) return;
+  el = document.createElement("div");
+  el.id = KH_HINT_ID;
+  el.style.cssText = "background:#eef4ff;color:#1e3a8a;border:1px solid #c7d7fe;padding:8px 14px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:12px;margin:8px 12px;";
+  const text = document.createElement("div");
+  text.style.flex = "1";
+  text.textContent = "💡 Bản mới hiện được giá theo bảng giá của từng khách ngay trên đơn. Máy này cần cài lại extension một lần: xem mục Hướng dẫn cài extension trên trang Bảng giá.";
+  const ok = document.createElement("button");
+  ok.type = "button";
+  ok.textContent = "Đã hiểu";
+  ok.style.cssText = "background:#1e3a8a;color:#fff;border:0;border-radius:6px;padding:4px 12px;font-weight:600;cursor:pointer;white-space:nowrap;";
+  ok.addEventListener("click", () => {
+    try { localStorage.setItem(KH_HINT_SEEN_KEY, "1"); } catch (e) { /* không lưu được thì chỉ ẩn lần này */ }
+    el.remove();
+  });
+  el.append(text, ok);
+  khInsertAboveProducts(el);
+}
+
+let khShown = false;   // đang có thứ gì của phần này trên trang không (để trang khác khỏi phải dọn mỗi giây)
+function khTick() {
+  const onForm = khOnOrderForm();
+  if (!onForm) {
+    if (khShown) {
+      khShown = false;
+      khRenderBanner(null);
+      khRenderRows(null);
+      khRenderShellHint(false);
+    }
+    return;
+  }
+  khShown = true;
+  if (!khCanAsk()) {
+    khRenderBanner(null);
+    khRenderRows(null);
+    khRenderShellHint(true);
+    return;
+  }
+  khRenderShellHint(false);
+  khSetupDelegation();
+  const phone = khDetectPhone();
+  const customer = phone ? khCustomerFor(phone) : null;
+  if (!customer) {
+    khRenderBanner(null);
+    khRenderRows(null);
+    return;
+  }
+  const table = khTableFor(customer.id);
+  khRenderBanner(customer, table);
+  khRenderRows(table);
+}
+
+// Vừa kết nối / ngắt kết nối Bảng giá (phần vỏ báo): bỏ hết kết quả đang nhớ rồi tra lại
+window.addEventListener("nhs-bg-changed", () => {
+  khLookups.clear();
+  khTables.clear();
+  khTick();
+});
+setInterval(khTick, 1000);
 
 })();

@@ -1,8 +1,8 @@
-/* Nhanh vn Đại Dương (Sale) — inject.bundle.js v1.0.1 (đã ký; build 2026-11-12T06:32:47.173Z) */
+/* Nhanh vn Đại Dương (Sale) — inject.bundle.js v1.0.2 (đã ký; build 2026-11-12T07:17:55.864Z) */
 (function () {
   if (window["__payload_inject_bundle_js"]) return;
-  window["__payload_inject_bundle_js"] = "1.0.1";
-  try { document.documentElement.setAttribute("data-nhs-payload", "1.0.1"); } catch (e) {}
+  window["__payload_inject_bundle_js"] = "1.0.2";
+  try { document.documentElement.setAttribute("data-nhs-payload", "1.0.2"); } catch (e) {}
 window.addEventListener('nhanh-ext-fill-price', function (e) {
     var marker = e.detail && e.detail.marker;
     var value = e.detail && e.detail.value;

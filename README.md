@@ -79,7 +79,7 @@ Mỗi máy có mã riêng; quản lý / thu hồi tại https://banggia.baobidai
 
 # Nhanh vn Đại Dương — bản cho Sale (extension riêng, trên nhanh.vn)
 
-QR thanh toán, upload ảnh đơn hàng, các nút tiện ích trên Nhanh.vn. Phần chính hiện tại: **v1.0.1** · phần vỏ: **v3.0.0**
+QR thanh toán, upload ảnh đơn hàng, các nút tiện ích trên Nhanh.vn. Phần chính hiện tại: **v1.0.2** · phần vỏ: **v3.1.0**
 
 **Cài mới:** [install/NhanhSale.zip](https://github.com/trithucnguyen97/duyet-bao-gia/raw/main/install/NhanhSale.zip) → giải nén (thư mục `NhanhSale`, để cố định)
 → `chrome://extensions` → Developer mode → Load unpacked → chọn `NhanhSale` → Chi tiết → bật **Cho phép tập lệnh người dùng** (Allow User Scripts) → tải lại trang Nhanh.vn.
